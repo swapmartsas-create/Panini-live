@@ -1,0 +1,226 @@
+:root {
+  --neon-blue: #00AEEF;
+  --electric-cyan: #00E5FF;
+  --vibrant-purple: #7B2EFF;
+  --hot-magenta: #FF006E;
+  --energy-orange: #FF6B00;
+  --dark-bg: #0A0A0F;
+  --dark-secondary: #12121A;
+  --light-text: #F5F7FA;
+  --muted-text: #A0A7B5;
+  
+  --grad-cyan-purple: linear-gradient(135deg, var(--electric-cyan), var(--vibrant-purple));
+  --grad-blue-magenta: linear-gradient(135deg, var(--neon-blue), var(--hot-magenta));
+  --grad-orange-pink: linear-gradient(135deg, var(--energy-orange), var(--hot-magenta));
+  --grad-dark-blue: linear-gradient(135deg, #050510, var(--neon-blue));
+  
+  --glass-bg: rgba(18, 18, 26, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: var(--light-text);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+h1, h2, h3, .heading {
+  font-family: 'Montserrat', 'League Spartan', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+/* Animations */
+@keyframes glow {
+  0%, 100% { opacity: 0.8; filter: blur(5px); }
+  50% { opacity: 1; filter: blur(8px); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes bgPulse {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Global Styles */
+.fifa-bg {
+  background: radial-gradient(circle at 0% 0%, rgba(0, 174, 239, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 100% 100%, rgba(123, 46, 255, 0.15) 0%, transparent 50%),
+              var(--dark-bg);
+  min-height: 100vh;
+  position: relative;
+}
+
+.fifa-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("https://www.transparenttextures.com/patterns/cubes.png");
+  opacity: 0.05;
+  pointer-events: none;
+}
+
+/* Components */
+.card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--electric-cyan);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+}
+
+.btn {
+  padding: 1rem 1.5rem;
+  border-radius: 1rem;
+  border: none;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--grad-cyan-purple);
+  color: white;
+  box-shadow: 0 4px 15px rgba(123, 46, 255, 0.4);
+}
+
+.btn-primary:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 25px rgba(0, 229, 255, 0.6);
+}
+
+.btn-secondary {
+  background: var(--dark-secondary);
+  border: 2px solid var(--neon-blue);
+  color: var(--neon-blue);
+}
+
+.btn-secondary:hover {
+  background: var(--neon-blue);
+  color: white;
+}
+
+.input-field {
+  background: var(--dark-secondary);
+  border: 2px solid var(--glass-border);
+  border-radius: 1rem;
+  padding: 1rem;
+  color: white;
+  font-size: 1.1rem;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--electric-cyan);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 1rem;
+  border: none;
+  background: transparent;
+  color: var(--muted-text);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+  color: var(--electric-cyan);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 4px;
+  background: var(--electric-cyan);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--electric-cyan);
+}
+
+/* Badge / Sticker Styles */
+.sticker {
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.5rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.sticker-faltante {
+  background: rgba(255, 107, 0, 0.1);
+  color: var(--energy-orange);
+  border-color: var(--energy-orange);
+}
+
+.sticker-faltante.active {
+  background: var(--energy-orange);
+  color: white;
+  box-shadow: 0 0 15px var(--energy-orange);
+}
+
+.sticker-repetida {
+  background: rgba(0, 229, 255, 0.1);
+  color: var(--electric-cyan);
+  border-color: var(--electric-cyan);
+}
+
+.sticker-repetida.active {
+  background: var(--electric-cyan);
+  color: white;
+  box-shadow: 0 0 15px var(--electric-cyan);
+}
+
+/* Utilities */
+.text-neon {
+  color: var(--electric-cyan);
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+
+.grad-text {
+  background: var(--grad-cyan-purple);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
