@@ -16,7 +16,7 @@ import {
 
 // ─── DATOS INICIALES ──────────────────────────────────────────────────────────
 const FALTANTES = {
-  "Especiales/FWC": [0, 4, 5, 8, 17, 18],
+  "Especiales FWC": [0, 4, 5, 8, 17, 18],
   "México": [2, 3, 10, 11, 17, 18, 19],
   "Sudáfrica": [1, 4, 6, 9, 12, 13, 14, 15, 17, 18, 19],
   "Corea del Sur": [4, 5, 8, 10, 15, 17, 18, 19, 20],
@@ -109,8 +109,8 @@ export default function App() {
       const data = snapshot.val();
       if (data) {
         setEstado({
-          faltantes: data.faltantes || FALTANTES,
-          repetidas: data.repetidas || REPETIDAS,
+          faltantes: data.faltantes || {},
+          repetidas: data.repetidas || {},
           enProgreso: data.enProgreso || [],
           entregadas: data.entregadas || [],
         });
