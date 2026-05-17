@@ -96,12 +96,19 @@ export default function App() {
   const [estado, setEstado] = useState({
     faltantes: FALTANTES,
     repetidas: REPETIDAS,
-    enProgreso: [],
     entregadas: [],
   });
 
   const [pendientes, setPendientes] = useState({});
   const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
+
+  // Estados para Modo Trueque
+  const [carritoTrueque, setCarritoTrueque] = useState({ dando: [], recibiendo: [] });
+
+  // Estados para Gestor de Inventario
+  const [invInput, setInvInput] = useState('');
+  const [invResFalt, setInvResFalt] = useState(null);
+  const [invResRep, setInvResRep] = useState(null);
 
   // ─── FIREBASE: escuchar cambios en tiempo real ────────────────────────────
   useEffect(() => {
@@ -112,7 +119,6 @@ export default function App() {
         setEstado({
           faltantes: data.faltantes || {},
           repetidas: data.repetidas || {},
-          enProgreso: data.enProgreso || [],
           entregadas: data.entregadas || [],
         });
       }
@@ -140,12 +146,15 @@ export default function App() {
     const num = numMatch ? parseInt(numMatch[0]) : null;
     const texto = txt.replace(/\d+/g, '').trim();
 
-    for (const [codigo, laminas] of Object.entries(estado.repetidas)) {
+    for (const [codigo, laminas] of Object.entries(REPETIDAS)) { // BUSCAR EN CONSTANTE GLOBAL
       const codigoNorm = codigo.toLowerCase();
       const textoCoincide = !texto || codigoNorm.includes(texto);
-      const numCoincide = num === null || laminas.includes(num);
-      if (textoCoincide && numCoincide) {
-        return { clave: codigo, laminas: num !== null ? [num] : laminas, soloUna: num !== null };
+      const laminasActuales = estado.repetidas[codigo] || [];
+      const numCoincide = num === null || laminasActuales.includes(num);
+      
+      // En repetidas, solo mostramos si realmente tiene la lámina (para Negociar)
+      if (textoCoincide && numCoincide && laminasActuales.length > 0) {
+        return { clave: codigo, laminas: num !== null ? [num] : laminasActuales, soloUna: num !== null };
       }
     }
     return null;
@@ -158,12 +167,49 @@ export default function App() {
     const num = numMatch ? parseInt(numMatch[0]) : null;
     const texto = txt.replace(/\d+/g, '').trim();
 
-    for (const [equipo, laminas] of Object.entries(estado.faltantes)) {
+    for (const [equipo, laminasG] of Object.entries(FALTANTES)) { // BUSCAR EN CONSTANTE GLOBAL
       const equipoNorm = equipo.toLowerCase();
       const textoCoincide = !texto || equipoNorm.includes(texto);
-      const numCoincide = num === null || laminas.includes(num);
-      if (textoCoincide && numCoincide) {
-        return { clave: equipo, laminas: num !== null ? [num] : laminas, soloUna: num !== null };
+      const laminasActuales = estado.faltantes[equipo] || [];
+      const numCoincide = num === null || laminasActuales.includes(num);
+      
+      if (textoCoincide && numCoincide && laminasActuales.length > 0) {
+        return { clave: equipo, laminas: num !== null ? [num] : laminasActuales, soloUna: num !== null };
+      }
+    }
+    return null;
+  };
+
+  // Buscadores para Inventario (buscan en todo, sin importar si la tienes o no)
+  const buscarGlobalFaltantes = (input) => {
+    const txt = input.trim().toLowerCase();
+    if (!txt) return null;
+    const numMatch = txt.match(/\d+/);
+    const num = numMatch ? parseInt(numMatch[0]) : null;
+    if (num === null) return null;
+    const texto = txt.replace(/\d+/g, '').trim();
+
+    for (const [equipo, laminas] of Object.entries(FALTANTES)) {
+      if (!texto || equipo.toLowerCase().includes(texto)) {
+        const laTengo = !(estado.faltantes[equipo] || []).includes(num);
+        return { clave: equipo, num, esFaltante: !laTengo };
+      }
+    }
+    return null;
+  };
+
+  const buscarGlobalRepetidas = (input) => {
+    const txt = input.trim().toLowerCase();
+    if (!txt) return null;
+    const numMatch = txt.match(/\d+/);
+    const num = numMatch ? parseInt(numMatch[0]) : null;
+    if (num === null) return null;
+    const texto = txt.replace(/\d+/g, '').trim();
+
+    for (const [codigo, laminas] of Object.entries(REPETIDAS)) {
+      if (!texto || codigo.toLowerCase().includes(texto)) {
+        const cantidad = (estado.repetidas[codigo] || []).filter(l => l === num).length;
+        return { clave: codigo, num, cantidad };
       }
     }
     return null;
@@ -171,41 +217,83 @@ export default function App() {
 
   const onChangeTengo = (val) => { setInputTengo(val); setSelTengo(null); setResTengo(buscarEnRepetidas(val)); };
   const onChangeFalta = (val) => { setInputFalta(val); setSelFalta(null); setResFalta(buscarEnFaltantes(val)); };
+  
+  const onChangeInventario = (val) => { 
+    setInvInput(val); 
+    setInvResFalt(buscarGlobalFaltantes(val)); 
+    setInvResRep(buscarGlobalRepetidas(val)); 
+  };
 
-  // ─── ACCIONES ─────────────────────────────────────────────────────────────
-  const entregarLamina = (codigo, num) => {
-    const newRep = { ...estado.repetidas };
-    newRep[codigo] = newRep[codigo].filter(l => l !== num);
-    const newEntr = [{ codigo, num }, ...estado.entregadas];
-    update({ repetidas: newRep, entregadas: newEntr });
+  // ─── ACCIONES TRUEQUE ────────────────────────────────────────────────────────
+  const agregarDando = (codigo, num) => {
+    setCarritoTrueque(prev => ({ ...prev, dando: [...prev.dando, { codigo, num }] }));
     setInputTengo(''); setResTengo(null); setSelTengo(null);
   };
 
-  const deshacerEntrega = (idx) => {
-    const item = estado.entregadas[idx];
-    const newEntr = estado.entregadas.filter((_, i) => i !== idx);
-    const newRep = { ...estado.repetidas };
-    newRep[item.codigo] = [...(newRep[item.codigo] || []), item.num].sort((a, b) => a - b);
-    update({ repetidas: newRep, entregadas: newEntr });
+  const quitarDando = (idx) => {
+    setCarritoTrueque(prev => ({ ...prev, dando: prev.dando.filter((_, i) => i !== idx) }));
   };
 
-  const acordarCambio = (equipo, num) => {
-    const newProg = [{ equipo, num }, ...estado.enProgreso];
-    update({ enProgreso: newProg });
+  const agregarRecibiendo = (equipo, num) => {
+    setCarritoTrueque(prev => ({ ...prev, recibiendo: [...prev.recibiendo, { equipo, num }] }));
     setInputFalta(''); setResFalta(null); setSelFalta(null);
   };
 
-  const deshacerProgreso = (idx) => {
-    const newProg = estado.enProgreso.filter((_, i) => i !== idx);
-    update({ enProgreso: newProg });
+  const quitarRecibiendo = (idx) => {
+    setCarritoTrueque(prev => ({ ...prev, recibiendo: prev.recibiendo.filter((_, i) => i !== idx) }));
   };
 
-  const pegarLamina = (idx) => {
-    const item = estado.enProgreso[idx];
-    const newProg = estado.enProgreso.filter((_, i) => i !== idx);
+  const sellarTrueque = () => {
+    if (carritoTrueque.dando.length === 0 && carritoTrueque.recibiendo.length === 0) return;
+
+    let newFalt = { ...estado.faltantes };
+    let newRep = { ...estado.repetidas };
+    const newEntr = [...estado.entregadas];
+
+    carritoTrueque.dando.forEach(item => {
+      newRep[item.codigo] = (newRep[item.codigo] || []).filter(l => l !== item.num);
+      newEntr.unshift({ codigo: item.codigo, num: item.num });
+    });
+
+    carritoTrueque.recibiendo.forEach(item => {
+      newFalt[item.equipo] = (newFalt[item.equipo] || []).filter(l => l !== item.num);
+    });
+
+    update({ faltantes: newFalt, repetidas: newRep, entregadas: newEntr });
+    setCarritoTrueque({ dando: [], recibiendo: [] });
+  };
+
+  // ─── ACCIONES INVENTARIO ──────────────────────────────────────────────────────
+  const sumarRepetida = (codigo, num) => {
+    const newRep = { ...estado.repetidas };
+    newRep[codigo] = [...(newRep[codigo] || []), num].sort((a,b) => a - b);
+    update({ repetidas: newRep });
+    onChangeInventario(invInput);
+  };
+
+  const restarRepetida = (codigo, num) => {
+    const newRep = { ...estado.repetidas };
+    const arr = newRep[codigo] || [];
+    const idx = arr.indexOf(num);
+    if (idx > -1) {
+      arr.splice(idx, 1);
+      newRep[codigo] = arr;
+      update({ repetidas: newRep });
+      onChangeInventario(invInput);
+    }
+  };
+
+  const toggleFaltanteInv = (equipo, num, esFaltanteActualmente) => {
     const newFalt = { ...estado.faltantes };
-    newFalt[item.equipo] = (newFalt[item.equipo] || []).filter(l => l !== item.num);
-    update({ enProgreso: newProg, faltantes: newFalt });
+    if (esFaltanteActualmente) {
+      // Remover de faltantes
+      newFalt[equipo] = (newFalt[equipo] || []).filter(l => l !== num);
+    } else {
+      // Agregar a faltantes
+      newFalt[equipo] = [...(newFalt[equipo] || []), num].sort((a,b) => a - b);
+    }
+    update({ faltantes: newFalt });
+    onChangeInventario(invInput);
   };
 
   const togglePendiente = (key) => setPendientes(prev => ({ ...prev, [key]: !prev[key] }));
@@ -264,151 +352,274 @@ export default function App() {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 1rem 8rem' }}>
         
         {/* TABS NAVIGATION */}
-        <div className="card" style={{ padding: '0.5rem', marginBottom: '2rem', display: 'flex' }}>
-          <button className={`tab-btn ${tab === 'negociar' ? 'active' : ''}`} onClick={() => setTab('negociar')}>
-            Negociar
+        <div className="card" style={{ padding: '0.5rem', marginBottom: '2rem', display: 'flex', overflowX: 'auto', gap: '0.5rem' }}>
+          <button className={`tab-btn ${tab === 'negociar' ? 'active' : ''}`} onClick={() => setTab('negociar')} style={{ whiteSpace: 'nowrap' }}>
+            Trueque
           </button>
-          <button className={`tab-btn ${tab === 'estado' ? 'active' : ''}`} onClick={() => setTab('estado')}>
+          <button className={`tab-btn ${tab === 'inventario' ? 'active' : ''}`} onClick={() => setTab('inventario')} style={{ whiteSpace: 'nowrap' }}>
+            Inventario
+          </button>
+          <button className={`tab-btn ${tab === 'estado' ? 'active' : ''}`} onClick={() => setTab('estado')} style={{ whiteSpace: 'nowrap' }}>
             Estado
           </button>
-          <button className={`tab-btn ${tab === 'checklist' ? 'active' : ''}`} onClick={() => setTab('checklist')}>
+          <button className={`tab-btn ${tab === 'checklist' ? 'active' : ''}`} onClick={() => setTab('checklist')} style={{ whiteSpace: 'nowrap' }}>
             Checklist
           </button>
         </div>
 
-        {/* ── NEGOCIAR ── */}
+        {/* ── NEGOCIAR (TRUEQUE) ── */}
         {tab === 'negociar' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gap: '2rem' }}>
             
-            {/* INPUT SECTION: TENGO */}
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <Zap size={20} style={{ color: 'var(--electric-cyan)' }} />
-                <h3 className="text-neon" style={{ fontSize: '0.9rem' }}>Láminas para Salir</h3>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <Search size={20} style={{ position: 'absolute', left: '1rem', top: '1rem', color: 'var(--muted-text)' }} />
-                <input 
-                  className="input-field" 
-                  placeholder="Buscar repetidas (ej. MEX 8)" 
-                  style={{ paddingLeft: '3rem' }}
-                  value={inputTengo} 
-                  onChange={e => onChangeTengo(e.target.value)} 
-                />
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {/* ZONA: YO DOY */}
+              <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <Send size={20} style={{ color: 'var(--electric-cyan)' }} />
+                  <h3 className="text-neon" style={{ fontSize: '0.9rem' }}>YO DOY (Repetidas)</h3>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Search size={20} style={{ position: 'absolute', left: '1rem', top: '1rem', color: 'var(--muted-text)' }} />
+                  <input 
+                    className="input-field" 
+                    placeholder="Buscar (ej. MEX 8)" 
+                    style={{ paddingLeft: '3rem' }}
+                    value={inputTengo} 
+                    onChange={e => onChangeTengo(e.target.value)} 
+                  />
+                </div>
 
-              <div style={{ marginTop: '1rem' }}>
-                {inputTengo && !resTengo && (
-                  <div style={{ padding: '1rem', background: 'rgba(255, 0, 110, 0.1)', borderRadius: '1rem', border: '1px solid var(--hot-magenta)' }}>
-                    <p style={{ color: 'var(--hot-magenta)', fontWeight: 800, textAlign: 'center' }}>NO SE ENCONTRARON REPETIDAS</p>
-                  </div>
-                )}
+                <div style={{ marginTop: '1rem' }}>
+                  {inputTengo && !resTengo && (
+                    <div style={{ padding: '1rem', background: 'rgba(255, 0, 110, 0.1)', borderRadius: '1rem', border: '1px solid var(--hot-magenta)' }}>
+                      <p style={{ color: 'var(--hot-magenta)', fontWeight: 800, textAlign: 'center' }}>NO TIENES ESA REPETIDA</p>
+                    </div>
+                  )}
 
-                {resTengo && !selTengo && (
-                  <div style={{ animation: 'float 3s ease-in-out infinite' }}>
+                  {resTengo && !selTengo && (
                     <div className="card" style={{ background: 'var(--grad-cyan-purple)', border: 'none' }}>
                       <p style={{ fontWeight: 900, opacity: 0.8, fontSize: '0.8rem' }}>{resTengo.clave}</p>
                       {resTengo.soloUna ? (
                         <>
                           <h2 style={{ fontSize: '3.5rem', margin: '0.5rem 0' }}>#{resTengo.laminas[0]}</h2>
-                          <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => entregarLamina(resTengo.clave, resTengo.laminas[0])}>
-                            <CheckCircle2 size={18} /> CONFIRMAR CAMBIO
+                          <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => agregarDando(resTengo.clave, resTengo.laminas[0])}>
+                            <CheckCircle2 size={18} /> AGREGAR AL TRATO
                           </button>
                         </>
                       ) : (
                         <>
-                          <p style={{ fontWeight: 700, margin: '0.5rem 0' }}>{resTengo.laminas.length} REPETIDAS DISPONIBLES</p>
+                          <p style={{ fontWeight: 700, margin: '0.5rem 0' }}>{resTengo.laminas.length} DISPONIBLES</p>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            {resTengo.laminas.map(l => (
-                              <button key={l} className="sticker sticker-repetida active" onClick={() => setSelTengo(l)}>#{l}</button>
+                            {resTengo.laminas.map((l, i) => (
+                              <button key={`${l}-${i}`} className="sticker sticker-repetida active" onClick={() => setSelTengo(l)}>#{l}</button>
                             ))}
                           </div>
                         </>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {resTengo && selTengo && (
-                  <div className="card" style={{ background: 'var(--grad-cyan-purple)', border: 'none' }}>
-                    <p style={{ fontWeight: 900, opacity: 0.8 }}>{resTengo.clave}</p>
-                    <h2 style={{ fontSize: '3.5rem', margin: '0.5rem 0' }}>#{selTengo}</h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => entregarLamina(resTengo.clave, selTengo)}>
-                        <CheckCircle2 size={18} /> CONFIRMAR CAMBIO
-                      </button>
-                      <button className="btn" style={{ background: 'transparent', color: 'white', border: '2px solid white' }} onClick={() => setSelTengo(null)}>
-                        VOLVER
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* INPUT SECTION: ME FALTAN */}
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <Trophy size={20} style={{ color: 'var(--energy-orange)' }} />
-                <h3 style={{ color: 'var(--energy-orange)', fontSize: '0.9rem' }}>Adquirir Láminas</h3>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <Search size={20} style={{ position: 'absolute', left: '1rem', top: '1rem', color: 'var(--muted-text)' }} />
-                <input 
-                  className="input-field" 
-                  placeholder="Buscar faltantes (ej. ARG 10)" 
-                  style={{ paddingLeft: '3rem' }}
-                  value={inputFalta} 
-                  onChange={e => onChangeFalta(e.target.value)} 
-                />
-              </div>
-
-              <div style={{ marginTop: '1rem' }}>
-                {inputFalta && !resFalta && (
-                  <div style={{ padding: '1rem', background: 'rgba(255, 107, 0, 0.1)', borderRadius: '1rem', border: '1px solid var(--energy-orange)' }}>
-                    <p style={{ color: 'var(--energy-orange)', fontWeight: 800, textAlign: 'center' }}>NO ESTÁ EN LA LISTA DE FALTANTES</p>
-                  </div>
-                )}
-
-                {resFalta && !selFalta && (
-                  <div className="card" style={{ background: 'var(--grad-orange-pink)', border: 'none' }}>
-                    <p style={{ fontWeight: 900, opacity: 0.8 }}>{resFalta.clave}</p>
-                    {resFalta.soloUna ? (
-                      <>
-                        <h2 style={{ fontSize: '3.5rem', margin: '0.5rem 0' }}>#{resFalta.laminas[0]}</h2>
-                        <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => acordarCambio(resFalta.clave, resFalta.laminas[0])}>
-                          <Zap size={18} /> AGREGAR A PROGRESO
+                  {resTengo && selTengo && (
+                    <div className="card" style={{ background: 'var(--grad-cyan-purple)', border: 'none' }}>
+                      <p style={{ fontWeight: 900, opacity: 0.8 }}>{resTengo.clave}</p>
+                      <h2 style={{ fontSize: '3.5rem', margin: '0.5rem 0' }}>#{selTengo}</h2>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => agregarDando(resTengo.clave, selTengo)}>
+                          <CheckCircle2 size={18} /> AGREGAR AL TRATO
                         </button>
-                      </>
-                    ) : (
-                      <>
-                        <p style={{ fontWeight: 700, margin: '0.5rem 0' }}>{resFalta.laminas.length} FALTANTES</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          {resFalta.laminas.map(l => (
-                            <button key={l} className="sticker sticker-faltante active" onClick={() => setSelFalta(l)}>#{l}</button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                        <button className="btn" style={{ background: 'transparent', color: 'white', border: '2px solid white' }} onClick={() => setSelTengo(null)}>
+                          VOLVER
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                {resFalta && selFalta && (
-                  <div className="card" style={{ background: 'var(--grad-orange-pink)', border: 'none' }}>
-                    <p style={{ fontWeight: 900, opacity: 0.8 }}>{resFalta.clave}</p>
-                    <h2 style={{ fontSize: '3.5rem', margin: '0.5rem 0' }}>#{selFalta}</h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => acordarCambio(resFalta.clave, selFalta)}>
-                        <Zap size={18} /> AGREGAR A PROGRESO
-                      </button>
-                      <button className="btn" style={{ background: 'transparent', color: 'white', border: '2px solid white' }} onClick={() => setSelFalta(null)}>
-                        VOLVER
+              {/* ZONA: YO RECIBO */}
+              <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <Trophy size={20} style={{ color: 'var(--energy-orange)' }} />
+                  <h3 style={{ color: 'var(--energy-orange)', fontSize: '0.9rem' }}>YO RECIBO (Faltantes)</h3>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Search size={20} style={{ position: 'absolute', left: '1rem', top: '1rem', color: 'var(--muted-text)' }} />
+                  <input 
+                    className="input-field" 
+                    placeholder="Buscar (ej. ARG 10)" 
+                    style={{ paddingLeft: '3rem' }}
+                    value={inputFalta} 
+                    onChange={e => onChangeFalta(e.target.value)} 
+                  />
+                </div>
+
+                <div style={{ marginTop: '1rem' }}>
+                  {inputFalta && !resFalta && (
+                    <div style={{ padding: '1rem', background: 'rgba(255, 107, 0, 0.1)', borderRadius: '1rem', border: '1px solid var(--energy-orange)' }}>
+                      <p style={{ color: 'var(--energy-orange)', fontWeight: 800, textAlign: 'center' }}>YA LA TIENES</p>
+                    </div>
+                  )}
+
+                  {resFalta && !selFalta && (
+                    <div className="card" style={{ background: 'var(--grad-orange-pink)', border: 'none' }}>
+                      <p style={{ fontWeight: 900, opacity: 0.8 }}>{resFalta.clave}</p>
+                      {resFalta.soloUna ? (
+                        <>
+                          <h2 style={{ fontSize: '3.5rem', margin: '0.5rem 0' }}>#{resFalta.laminas[0]}</h2>
+                          <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => agregarRecibiendo(resFalta.clave, resFalta.laminas[0])}>
+                            <CheckCircle2 size={18} /> AGREGAR AL TRATO
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p style={{ fontWeight: 700, margin: '0.5rem 0' }}>{resFalta.laminas.length} FALTANTES</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            {resFalta.laminas.map(l => (
+                              <button key={l} className="sticker sticker-faltante active" onClick={() => setSelFalta(l)}>#{l}</button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {resFalta && selFalta && (
+                    <div className="card" style={{ background: 'var(--grad-orange-pink)', border: 'none' }}>
+                      <p style={{ fontWeight: 900, opacity: 0.8 }}>{resFalta.clave}</p>
+                      <h2 style={{ fontSize: '3.5rem', margin: '0.5rem 0' }}>#{selFalta}</h2>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <button className="btn btn-primary" style={{ width: '100%', background: 'var(--dark-bg)' }} onClick={() => agregarRecibiendo(resFalta.clave, selFalta)}>
+                          <CheckCircle2 size={18} /> AGREGAR AL TRATO
+                        </button>
+                        <button className="btn" style={{ background: 'transparent', color: 'white', border: '2px solid white' }} onClick={() => setSelFalta(null)}>
+                          VOLVER
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* CARRITO DE TRUEQUE RESUMEN */}
+            {(carritoTrueque.dando.length > 0 || carritoTrueque.recibiendo.length > 0) && (
+              <div className="card" style={{ border: '2px solid var(--electric-cyan)', padding: '1.5rem' }}>
+                <h2 className="text-neon" style={{ textAlign: 'center', marginBottom: '1.5rem', fontSize: '1.5rem' }}>MESA DE TRUEQUE</h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {carritoTrueque.dando.length > 0 && (
+                    <div style={{ padding: '1rem', background: 'rgba(0, 255, 255, 0.05)', borderRadius: '0.5rem' }}>
+                      <p style={{ color: 'var(--electric-cyan)', fontWeight: 900, marginBottom: '0.5rem' }}>ENTREGAS ({carritoTrueque.dando.length}):</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {carritoTrueque.dando.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--dark-bg)', padding: '0.2rem 0.5rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 800 }}>
+                            {item.codigo} #{item.num}
+                            <button onClick={() => quitarDando(idx)} style={{ background: 'none', border: 'none', color: 'var(--hot-magenta)', cursor: 'pointer', display: 'flex' }}><XCircle size={14}/></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {carritoTrueque.recibiendo.length > 0 && (
+                    <div style={{ padding: '1rem', background: 'rgba(255, 107, 0, 0.05)', borderRadius: '0.5rem' }}>
+                      <p style={{ color: 'var(--energy-orange)', fontWeight: 900, marginBottom: '0.5rem' }}>RECIBES ({carritoTrueque.recibiendo.length}):</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {carritoTrueque.recibiendo.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--dark-bg)', padding: '0.2rem 0.5rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 800 }}>
+                            {item.equipo} #{item.num}
+                            <button onClick={() => quitarRecibiendo(idx)} style={{ background: 'none', border: 'none', color: 'var(--hot-magenta)', cursor: 'pointer', display: 'flex' }}><XCircle size={14}/></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button className="btn btn-primary" style={{ width: '100%', height: '4rem', fontSize: '1.2rem', marginTop: '1.5rem', background: 'var(--grad-cyan-purple)', boxShadow: '0 0 20px rgba(0, 255, 255, 0.4)' }} onClick={sellarTrueque}>
+                  <Zap /> SELLAR TRUEQUE
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── INVENTARIO (GESTOR / ABRIR SOBRES) ── */}
+        {tab === 'inventario' && (
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+              <LayoutGrid size={20} className="text-neon" />
+              <h3 className="text-neon" style={{ fontSize: '1.2rem' }}>Gestor de Inventario</h3>
+            </div>
+            <p style={{ color: 'var(--muted-text)', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+              Busca una lámina para corregir su estado o ingresa las nuevas que compraste.
+            </p>
+            <div style={{ position: 'relative', marginBottom: '2rem' }}>
+              <Search size={20} style={{ position: 'absolute', left: '1rem', top: '1rem', color: 'var(--muted-text)' }} />
+              <input 
+                className="input-field" 
+                placeholder="Ej. MEX 8, Catar 20..." 
+                style={{ paddingLeft: '3rem' }}
+                value={invInput} 
+                onChange={e => onChangeInventario(e.target.value)} 
+              />
+            </div>
+
+            {invInput && (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {/* Panel de Faltantes */}
+                {invResFalt ? (
+                  <div style={{ padding: '1.5rem', background: 'var(--dark-secondary)', borderRadius: '1rem', borderLeft: '4px solid var(--energy-orange)' }}>
+                    <h4 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>{invResFalt.clave} #{invResFalt.num}</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                      <span style={{ fontWeight: 800, color: invResFalt.esFaltante ? 'var(--energy-orange)' : 'var(--electric-cyan)' }}>
+                        {invResFalt.esFaltante ? '❌ TE FALTA' : '✅ YA LA TIENES PEGADA'}
+                      </span>
+                      <button 
+                        className="btn" 
+                        style={{ background: 'var(--dark-bg)', border: `2px solid ${invResFalt.esFaltante ? 'var(--electric-cyan)' : 'var(--energy-orange)'}` }}
+                        onClick={() => toggleFaltanteInv(invResFalt.clave, invResFalt.num, invResFalt.esFaltante)}
+                      >
+                        {invResFalt.esFaltante ? 'MARCAR COMO CONSEGUIDA' : 'MARCAR COMO FALTANTE'}
                       </button>
                     </div>
                   </div>
+                ) : (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted-text)' }}>No coincide con nombres de faltantes.</p>
+                )}
+
+                {/* Panel de Repetidas */}
+                {invResRep ? (
+                  <div style={{ padding: '1.5rem', background: 'var(--dark-secondary)', borderRadius: '1rem', borderLeft: '4px solid var(--electric-cyan)' }}>
+                    <h4 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>{invResRep.clave} #{invResRep.num}</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                      <span style={{ fontWeight: 800, color: invResRep.cantidad > 0 ? 'var(--electric-cyan)' : 'var(--muted-text)' }}>
+                        {invResRep.cantidad > 0 ? `🔄 TIENES ${invResRep.cantidad} REPETIDAS` : 'NO TIENES REPETIDAS'}
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          className="btn" 
+                          style={{ background: 'var(--dark-bg)', border: '2px solid var(--hot-magenta)', opacity: invResRep.cantidad > 0 ? 1 : 0.5 }}
+                          disabled={invResRep.cantidad === 0}
+                          onClick={() => restarRepetida(invResRep.clave, invResRep.num)}
+                        >
+                          - QUITAR
+                        </button>
+                        <button 
+                          className="btn" 
+                          style={{ background: 'var(--dark-bg)', border: '2px solid var(--electric-cyan)' }}
+                          onClick={() => sumarRepetida(invResRep.clave, invResRep.num)}
+                        >
+                          + AGREGAR
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted-text)' }}>No coincide con códigos de repetidas.</p>
                 )}
               </div>
-            </div>
+            )}
           </div>
         )}
 
