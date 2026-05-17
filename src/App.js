@@ -658,25 +658,7 @@ export default function App() {
 
 
 
-            {/* TRADES HISTORY */}
-            {estado.entregadas.length > 0 && (
-              <div className="card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                  <Send size={20} style={{ color: 'var(--hot-magenta)' }} />
-                  <h3>Cambios Exitosos ({estado.entregadas.length})</h3>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {estado.entregadas.map((item, idx) => (
-                    <div key={idx} style={{ padding: '1rem', background: 'rgba(255, 0, 110, 0.05)', borderLeft: '4px solid var(--hot-magenta)', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 900 }}>#{item.num} {item.codigo}</span>
-                      <button style={{ background: 'transparent', border: 'none', color: 'var(--hot-magenta)', fontWeight: 800, cursor: 'pointer', fontSize: '0.7rem' }} onClick={() => deshacerEntrega(idx)}>
-                        DESHACER
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
             {/* RAW DATA GRIDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
@@ -685,7 +667,7 @@ export default function App() {
                 <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '1rem', fontSize: '0.8rem' }}>
                   {Object.entries(estado.faltantes).filter(([_, l]) => l.length > 0).map(([eq, lams]) => (
                     <div key={eq} style={{ marginBottom: '0.5rem', padding: '0.5rem', borderBottom: '1px solid var(--glass-border)' }}>
-                      <span style={{ color: 'var(--energy-orange)', fontWeight: 900 }}>{eq}:</span> {lams.join(', ')}
+                      <span style={{ color: 'var(--energy-orange)', fontWeight: 900 }}>{eq} ({MAPA_NOMBRES[eq] || eq}):</span> {lams.join(', ')}
                     </div>
                   ))}
                 </div>
@@ -728,7 +710,7 @@ export default function App() {
               {checklistTipo === 'faltantes' ? (
                 Object.entries(estado.faltantes).filter(([_, l]) => l.length > 0).map(([eq, lams]) => (
                   <div key={eq} className="card">
-                    <h4 style={{ color: 'var(--energy-orange)', marginBottom: '1rem' }}>{eq}</h4>
+                    <h4 style={{ color: 'var(--energy-orange)', marginBottom: '1rem' }}>{eq} ({MAPA_NOMBRES[eq] || eq})</h4>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                       {lams.map(l => {
                         const key = `faltante|${eq}|${l}`;
