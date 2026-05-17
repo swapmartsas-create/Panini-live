@@ -143,6 +143,8 @@ export default function App() {
   };
 
   // ─── BÚSQUEDA ─────────────────────────────────────────────────────────────
+  const obtenerNombreCompleto = (cod) => Object.keys(MAPA_NOMBRES).find(k => MAPA_NOMBRES[k] === cod) || cod;
+
   const coincide = (clavePrimaria, textoBusqueda) => {
     if (!textoBusqueda) return true;
     const busq = textoBusqueda.toLowerCase();
@@ -654,33 +656,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* PROGRESS LIST */}
-            {estado.enProgreso.length > 0 && (
-              <div className="card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                  <History size={20} className="text-neon" />
-                  <h3>Adquisiciones Activas ({estado.enProgreso.length})</h3>
-                </div>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {estado.enProgreso.map((item, idx) => (
-                    <div key={idx} className="card" style={{ background: 'var(--dark-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
-                      <div>
-                        <span style={{ fontWeight: 900, fontSize: '1.2rem' }}>#{item.num}</span>
-                        <span style={{ marginLeft: '0.75rem', fontWeight: 600, color: 'var(--muted-text)' }}>{item.equipo}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn" style={{ padding: '0.5rem', background: 'rgba(255,0,0,0.2)', color: '#ff4444' }} onClick={() => deshacerProgreso(idx)}>
-                          <XCircle size={20} />
-                        </button>
-                        <button className="btn btn-primary" style={{ padding: '0.5rem' }} onClick={() => pegarLamina(idx)}>
-                          <CheckCircle2 size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
             {/* TRADES HISTORY */}
             {estado.entregadas.length > 0 && (
@@ -719,7 +695,7 @@ export default function App() {
                 <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '1rem', fontSize: '0.8rem' }}>
                   {Object.entries(estado.repetidas).filter(([_, l]) => l.length > 0).map(([cod, lams]) => (
                     <div key={cod} style={{ marginBottom: '0.5rem', padding: '0.5rem', borderBottom: '1px solid var(--glass-border)' }}>
-                      <span style={{ color: 'var(--electric-cyan)', fontWeight: 900 }}>{cod}:</span> {lams.join(', ')}
+                      <span style={{ color: 'var(--electric-cyan)', fontWeight: 900 }}>{obtenerNombreCompleto(cod)} ({cod}):</span> {lams.join(', ')}
                     </div>
                   ))}
                 </div>
@@ -769,7 +745,7 @@ export default function App() {
               ) : (
                 Object.entries(estado.repetidas).filter(([_, l]) => l.length > 0).map(([cod, lams]) => (
                   <div key={cod} className="card">
-                    <h4 className="text-neon" style={{ marginBottom: '1rem' }}>{cod}</h4>
+                    <h4 className="text-neon" style={{ marginBottom: '1rem' }}>{obtenerNombreCompleto(cod)} ({cod})</h4>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                       {lams.map(l => {
                         const key = `repetida|${cod}|${l}`;
