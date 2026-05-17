@@ -81,6 +81,10 @@ const REPETIDAS = {
   "SUI": [2], "TUN": [5, 9], "TUR": [13], "UZB": [19, 20]
 };
 
+const MAPA_NOMBRES = {
+  "Especiales FWC": "FWC", "Catar": "QAT", "México": "MEX", "Sudáfrica": "RSA", "Corea del Sur": "KOR", "República Checa": "CZE", "Canadá": "CAN", "Bosnia": "BIH", "Suiza": "SUI", "Brasil": "BRA", "Marruecos": "MAR", "Haití": "HAI", "Escocia": "SCO", "Estados Unidos": "USA", "Paraguay": "PAR", "Australia": "AUS", "Turquía": "TUR", "Alemania": "GER", "Curazao": "CUW", "Costa de Marfil": "CIV", "Ecuador": "ECU", "Países Bajos": "NED", "Japón": "JPN", "Suecia": "SWE", "Túnez": "TUN", "Bélgica": "BEL", "Egipto": "EGY", "Irán": "IRN", "Nueva Zelanda": "NZL", "España": "ESP", "Cabo Verde": "CPV", "Arabia Saudita": "KSA", "Uruguay": "URU", "Francia": "FRA", "Senegal": "SEN", "Irak": "IRQ", "Noruega": "NOR", "Argentina": "ARG", "Argelia": "ALG", "Austria": "AUT", "Jordania": "JOR", "Portugal": "POR", "Congo": "COD", "Uzbekistán": "UZB", "Colombia": "COL", "Inglaterra": "ENG", "Croacia": "CRO", "Ghana": "GHA", "Panamá": "PAN", "Coca-Cola": "CC"
+};
+
 export default function App() {
   const [tab, setTab] = useState('negociar');
   const [checklistTipo, setChecklistTipo] = useState('faltantes');
@@ -139,6 +143,18 @@ export default function App() {
   };
 
   // ─── BÚSQUEDA ─────────────────────────────────────────────────────────────
+  const coincide = (clavePrimaria, textoBusqueda) => {
+    if (!textoBusqueda) return true;
+    const busq = textoBusqueda.toLowerCase();
+    if (clavePrimaria.toLowerCase().includes(busq)) return true;
+
+    let claveAlterna = MAPA_NOMBRES[clavePrimaria];
+    if (!claveAlterna) {
+      claveAlterna = Object.keys(MAPA_NOMBRES).find(k => MAPA_NOMBRES[k] === clavePrimaria);
+    }
+    return claveAlterna && claveAlterna.toLowerCase().includes(busq);
+  };
+
   const buscarEnRepetidas = (input) => {
     const txt = input.trim().toLowerCase();
     if (!txt) return null;
@@ -147,8 +163,7 @@ export default function App() {
     const texto = txt.replace(/\d+/g, '').trim();
 
     for (const [codigo, laminas] of Object.entries(REPETIDAS)) { // BUSCAR EN CONSTANTE GLOBAL
-      const codigoNorm = codigo.toLowerCase();
-      const textoCoincide = !texto || codigoNorm.includes(texto);
+      const textoCoincide = coincide(codigo, texto);
       const laminasActuales = estado.repetidas[codigo] || [];
       const numCoincide = num === null || laminasActuales.includes(num);
       
@@ -168,8 +183,7 @@ export default function App() {
     const texto = txt.replace(/\d+/g, '').trim();
 
     for (const [equipo, laminasG] of Object.entries(FALTANTES)) { // BUSCAR EN CONSTANTE GLOBAL
-      const equipoNorm = equipo.toLowerCase();
-      const textoCoincide = !texto || equipoNorm.includes(texto);
+      const textoCoincide = coincide(equipo, texto);
       const laminasActuales = estado.faltantes[equipo] || [];
       const numCoincide = num === null || laminasActuales.includes(num);
       
@@ -190,7 +204,7 @@ export default function App() {
     const texto = txt.replace(/\d+/g, '').trim();
 
     for (const [equipo, laminas] of Object.entries(FALTANTES)) {
-      if (!texto || equipo.toLowerCase().includes(texto)) {
+      if (coincide(equipo, texto)) {
         const laTengo = !(estado.faltantes[equipo] || []).includes(num);
         return { clave: equipo, num, esFaltante: !laTengo };
       }
@@ -207,7 +221,7 @@ export default function App() {
     const texto = txt.replace(/\d+/g, '').trim();
 
     for (const [codigo, laminas] of Object.entries(REPETIDAS)) {
-      if (!texto || codigo.toLowerCase().includes(texto)) {
+      if (coincide(codigo, texto)) {
         const cantidad = (estado.repetidas[codigo] || []).filter(l => l === num).length;
         return { clave: codigo, num, cantidad };
       }
