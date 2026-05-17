@@ -92,8 +92,6 @@ export default function App() {
 
   const [inputTengo, setInputTengo] = useState('');
   const [inputFalta, setInputFalta] = useState('');
-  const [resTengo, setResTengo] = useState(null);
-  const [resFalta, setResFalta] = useState(null);
   const [selTengo, setSelTengo] = useState(null);
   const [selFalta, setSelFalta] = useState(null);
 
@@ -111,8 +109,6 @@ export default function App() {
 
   // Estados para Gestor de Inventario
   const [invInput, setInvInput] = useState('');
-  const [invResFalt, setInvResFalt] = useState(null);
-  const [invResRep, setInvResRep] = useState(null);
 
   // ─── FIREBASE: escuchar cambios en tiempo real ────────────────────────────
   useEffect(() => {
@@ -231,19 +227,21 @@ export default function App() {
     return null;
   };
 
-  const onChangeTengo = (val) => { setInputTengo(val); setSelTengo(null); setResTengo(buscarEnRepetidas(val)); };
-  const onChangeFalta = (val) => { setInputFalta(val); setSelFalta(null); setResFalta(buscarEnFaltantes(val)); };
+  const onChangeTengo = (val) => { setInputTengo(val); setSelTengo(null); };
+  const onChangeFalta = (val) => { setInputFalta(val); setSelFalta(null); };
   
-  const onChangeInventario = (val) => { 
-    setInvInput(val); 
-    setInvResFalt(buscarGlobalFaltantes(val)); 
-    setInvResRep(buscarGlobalRepetidas(val)); 
-  };
+  const onChangeInventario = (val) => { setInvInput(val); };
+
+  // ─── ESTADO DERIVADO (Búsqueda en tiempo real instantánea) ────────────────────
+  const resTengo = buscarEnRepetidas(inputTengo);
+  const resFalta = buscarEnFaltantes(inputFalta);
+  const invResFalt = buscarGlobalFaltantes(invInput);
+  const invResRep = buscarGlobalRepetidas(invInput);
 
   // ─── ACCIONES TRUEQUE ────────────────────────────────────────────────────────
   const agregarDando = (codigo, num) => {
     setCarritoTrueque(prev => ({ ...prev, dando: [...prev.dando, { codigo, num }] }));
-    setInputTengo(''); setResTengo(null); setSelTengo(null);
+    setInputTengo(''); setSelTengo(null);
   };
 
   const quitarDando = (idx) => {
@@ -252,7 +250,7 @@ export default function App() {
 
   const agregarRecibiendo = (equipo, num) => {
     setCarritoTrueque(prev => ({ ...prev, recibiendo: [...prev.recibiendo, { equipo, num }] }));
-    setInputFalta(''); setResFalta(null); setSelFalta(null);
+    setInputFalta(''); setSelFalta(null);
   };
 
   const quitarRecibiendo = (idx) => {
@@ -284,7 +282,6 @@ export default function App() {
     const newRep = { ...estado.repetidas };
     newRep[codigo] = [...(newRep[codigo] || []), num].sort((a,b) => a - b);
     update({ repetidas: newRep });
-    onChangeInventario(invInput);
   };
 
   const restarRepetida = (codigo, num) => {
@@ -295,7 +292,6 @@ export default function App() {
       arr.splice(idx, 1);
       newRep[codigo] = arr;
       update({ repetidas: newRep });
-      onChangeInventario(invInput);
     }
   };
 
@@ -309,7 +305,6 @@ export default function App() {
       newFalt[equipo] = [...(newFalt[equipo] || []), num].sort((a,b) => a - b);
     }
     update({ faltantes: newFalt });
-    onChangeInventario(invInput);
   };
 
   const togglePendiente = (key) => setPendientes(prev => ({ ...prev, [key]: !prev[key] }));
