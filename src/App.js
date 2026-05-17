@@ -164,7 +164,7 @@ export default function App() {
     const num = numMatch ? parseInt(numMatch[0]) : null;
     const texto = txt.replace(/\d+/g, '').trim();
 
-    for (const [codigo, laminas] of Object.entries(REPETIDAS)) { // BUSCAR EN CONSTANTE GLOBAL
+    for (const [equipo, codigo] of Object.entries(MAPA_NOMBRES)) { // BUSCAR EN TODOS LOS PAÍSES GLOBALES
       const textoCoincide = coincide(codigo, texto);
       const laminasActuales = estado.repetidas[codigo] || [];
       const numCoincide = num === null || laminasActuales.includes(num);
@@ -222,7 +222,7 @@ export default function App() {
     if (num === null) return null;
     const texto = txt.replace(/\d+/g, '').trim();
 
-    for (const [codigo, laminas] of Object.entries(REPETIDAS)) {
+    for (const [equipo, codigo] of Object.entries(MAPA_NOMBRES)) { // BUSCAR EN TODOS LOS PAÍSES GLOBALES
       if (coincide(codigo, texto)) {
         const cantidad = (estado.repetidas[codigo] || []).filter(l => l === num).length;
         return { clave: codigo, num, cantidad };
